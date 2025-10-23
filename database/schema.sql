@@ -1,7 +1,8 @@
 -- Definimos la base de datos --
 USE visitas_db;
+	
 
--- Creamos la tabla "visitantes" (Esta estaba perfecta) --
+-- Creamos la tabla "visitantes" -- Lleva el control de los visitantes únicos
 CREATE TABLE visitantes ( 
     email VARCHAR(255) NOT NULL,
     fechaPrimeraVisita DATE,
@@ -14,7 +15,7 @@ CREATE TABLE visitantes (
 );
 
 
--- Creamos tabla "estadisticas" --
+-- Creamos tabla "estadisticas" -- Lleva el control de cada registro
 CREATE TABLE estadisticas (
     idEstadistica INT AUTO_INCREMENT NOT NULL,
     email VARCHAR(255), 
@@ -38,7 +39,7 @@ CREATE TABLE estadisticas (
 );
 
 
--- Creamos tabla "errores" --
+-- Creamos tabla "errores" -- Lleva el control de aquellos registros que no cumplieron alguna validación
 CREATE TABLE errores ( 
     idError INT AUTO_INCREMENT NOT NULL,
     nombreArchivo VARCHAR(255),
@@ -48,24 +49,16 @@ CREATE TABLE errores (
     
     PRIMARY KEY (idError)
 );
-	
 
 
-
-
-
+-- Creamos la tabla "bitacora" -- Bitacora de control para archivos que pudieron se procesados y no, y la tasa de registros exitosos en estos
+CREATE TABLE bitacora (
+	idBitacora INT AUTO_INCREMENT NOT NULL,
+	nombreArchivo VARCHAR(255),
+	registrosExitosos INT DEFAULT 0,
+	registrosFallidos INT DEFAULT 0,
+	estatus VARCHAR(255) NOT NULL,	-- Procesado/No procesado
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-
+	PRIMARY KEY (idBitacora)
+);
 
