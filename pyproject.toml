@@ -9,5 +9,6 @@ dependencies = [
     "pandas>=2.3.3",
     "paramiko>=4.0.0",
     "prefect>=3.4.24",
+    "python-dotenv>=1.1.1",
     "sqlalchemy>=2.0.44",
 ]

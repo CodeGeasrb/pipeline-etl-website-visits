@@ -452,6 +452,7 @@ dependencies = [
     { name = "pandas" },
     { name = "paramiko" },
     { name = "prefect" },
+    { name = "python-dotenv" },
     { name = "sqlalchemy" },
 ]
 
@@ -461,6 +462,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "paramiko", specifier = ">=4.0.0" },
     { name = "prefect", specifier = ">=3.4.24" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "sqlalchemy", specifier = ">=2.0.44" },
 ]
 
