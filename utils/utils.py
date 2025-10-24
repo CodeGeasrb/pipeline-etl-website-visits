@@ -3,15 +3,35 @@ from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, Set, Tuple
 
+
 import pandas as pd
+import numpy as np
 import logging
 import datetime
 import paramiko
+import time
 import os
 
 
 # Cargar variables de entorno para la configuración de la conexión SFTP y MySQL
 load_dotenv(dotenv_path="config/.env")
+
+
+# Columnas esperadas por archivo
+VALID_COLUMNS = [
+        'email', 'fecha_visita', 'jyv', 'Badmail', 'Baja', 
+        'Fecha_envio', 'Fecha_open', 'Opens', 'Opens_virales',
+        'Fecha_click', 'Clicks', 'Clicks_virales', 'Links', 
+        'IPs', 'Navegadores', 'Plataformas'
+]
+
+
+# Nombre de columnas de fechas en datos
+DATE_COLUMNS = [
+        "Fecha envio",
+        "Fecha open",
+        "Fecha click"
+]
 
 
 @contextmanager
@@ -71,28 +91,18 @@ def mysql_connection_string() -> str:
 
 
 def validate_file_loading(filepath: Path, logger: logging.Logger) -> Optional[pd.DataFrame]:
-    """ Función que valida que un archivo se pueda cargar como un dataframe de pandas siguiente el esque csv """
-    # intentamos leer el archivo
-    try:
-        # leemos el archivo
-        df = pd.read_csv(filepath)
+    """ Función que valida que un archivo se pueda cargar como un dataframe de pandas y que no esté vacío"""
+    # leemos el archivo
+    df = pd.read_csv(filepath)
 
-        # validamos que no esté vacío   
-        if df.empty:
-            return None
-
-        # devolvemos el df en caso contrario
-        return df 
-
-    # cachamos el error
-    except Exception as e:
-        # cualquier error
-        logger.error(f"Fallo al cargar el archivo. Error: {str(e)}")
-        # no devolvemos nada
-        return None
+    # validamos que no esté vacío   
+    if df.empty:
+        logger.warning("Alerta: El archivo se encuentra vacío")
+    
+    return df
 
 
-def validate_file_layout(file_df: pd.DataFrame, expected_columns: Set[str],  logger: logging.Logger) -> bool:
+def validate_file_layout(file_df: pd.DataFrame,  logger: logging.Logger) -> bool:
     """ Función que valida que un archivo cumpla con el formato de layout esperado """
     # creamos una copia del dataframe original por buenas prácticas
     file_copy = file_df.copy()
@@ -101,22 +111,20 @@ def validate_file_layout(file_df: pd.DataFrame, expected_columns: Set[str],  log
     file_columns_set = set(file_copy.columns)
 
     # validación de columnas esperadas
-    missing_columns = expected_columns - file_columns_set
+    logger.info("Validando columnas esperadas")
+    valid_columns = set(VALID_COLUMNS)
+    missing_columns = valid_columns - file_columns_set
     if missing_columns:
         logger.error("Fallo al cargar el archivo. Error: El layout no concuerda con el esperado")
         return False
     
     # validando que existan columnas extra
-    extra_columns = file_columns_set - expected_columns
+    logger.info("Validando presencia de columnas adicionales")
+    extra_columns = file_columns_set - valid_columns
     if extra_columns:
         # se lanza una advertencia
         logger.warning("Advertencia: Se han encontrado columnas adicionales en el archivo")
     return True
-
-
-import pandas as pd
-import logging
-from typing import Tuple
 
 
 def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -125,6 +133,7 @@ def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tupl
     file_df_copy = file_df.copy()
     
     # validación del formato del mail
+    logger.info("Validando formato de email")
     email_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$"
     file_df_copy["valid_email"] = (
         file_df_copy["email"].notna() &  # no es nulo
@@ -133,15 +142,9 @@ def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tupl
     )
     
     # validación de formato de fechas
-    date_column_names = [
-        "Fecha envio",
-        "Fecha open",
-        "Fecha click"
-    ]
-    
+    logger.info("Validando formato de fechas")
     date_pattern = r"^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}\s([01][0-9]|2[0-3]):[0-5][0-9]$"
-    
-    for column_name in date_column_names:
+    for column_name in DATE_COLUMNS:
         file_df_copy[f"valid_{column_name}"] = (
             file_df_copy[column_name].isna() |  # null o nan es válido en este caso
             (
@@ -151,7 +154,7 @@ def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tupl
             )
         )
     
-    file_df_copy["valid_dates"] = file_df_copy[[f"valid_{c}" for c in date_column_names if c in file_df_copy.columns]].all(axis=1)
+    file_df_copy["valid_dates"] = file_df_copy[[f"valid_{c}" for c in DATE_COLUMNS if c in file_df_copy.columns]].all(axis=1)
     
     # separamos los dataframes en registros validos/no válidos
     file_df_copy["is_valid"] = file_df_copy["valid_email"] & file_df_copy["valid_dates"]
@@ -192,12 +195,12 @@ def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tupl
         
         # Limpiar columnas auxiliares de validación
         validation_cols = ["valid_email", "valid_dates", "is_valid"] + \
-                         [f"valid_{c}" for c in date_column_names if f"valid_{c}" in file_df_copy_err.columns]
+                         [f"valid_{c}" for c in DATE_COLUMNS if f"valid_{c}" in file_df_copy_err.columns]
         file_df_copy_err = file_df_copy_err.drop(columns=validation_cols, errors='ignore')
     
     # Limpiar columnas auxiliares del DataFrame de registros válidos
     validation_cols = ["valid_email", "valid_dates", "is_valid"] + \
-                     [f"valid_{c}" for c in date_column_names if f"valid_{c}" in file_df_copy_ok.columns]
+                     [f"valid_{c}" for c in DATE_COLUMNS if f"valid_{c}" in file_df_copy_ok.columns]
     file_df_copy_ok = file_df_copy_ok.drop(columns=validation_cols, errors='ignore')
     
     # logging de resultados de validación
@@ -211,6 +214,28 @@ def validate_data_quality(file_df: pd.DataFrame, logger: logging.Logger) -> Tupl
     logger.info(f"Registros con errores (únicos): {unique_error_records} ({unique_error_records/total_records*100:.2f}%)")
     logger.info(f"Total de errores desglosados: {invalid_records_count}")
     return file_df_copy_ok, file_df_copy_err
+
+
+def prepare_data(filename: str, file_ok_df: pd.DataFrame, file_err_df: pd.DataFrame, logger: logging.Logger) -> Tuple(pd.DataFrame, pd.DataFrame):
+    """ Función para hacer las correcciones necesarias para dejar listas las tablas, previo a la carga """
+    # normalizamos los valores null/nan en los datos
+    logger.info("Normalizando elementos nulos")
+    file_ok_df = file_ok_df.replace("-", np.nan)
+    file_err_df =  file_err_df.replace("-", np.nan)
+
+    # preparando la tabla de estadísticas
+    logger.info("Preparando tabla 'estadísticas'")
+    stats_df = file_ok_df.copy()
+
+    # preparando la tabla de errores
+    if not file_err_df.empty:
+        logger.info("Preparando tabla 'errores'")
+        file_err_df["nombreArchivo"] = filename
+        errors_df = file_err_df[["nombreArchivo", "email", "tipoError"]].copy()
+        return stats_df, errors_df 
+    return stats_df, None
+
+
 
 
 

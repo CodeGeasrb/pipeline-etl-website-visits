@@ -41,7 +41,7 @@ CREATE TABLE estadisticas (
 
 -- Creamos tabla "errores" -- Lleva el control de aquellos registros que no cumplieron alguna validación
 CREATE TABLE errores ( 
-    idError INT AUTO_INCREMENT NOT NULL,
+    idError INT AUTO_INCREMENT NOT NULL,	# id automático
     nombreArchivo VARCHAR(255),
     email VARCHAR(255),
     tipoError VARCHAR(255),
