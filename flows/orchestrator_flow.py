@@ -28,6 +28,7 @@ def etl_flow_orchestration():
     # valimos que se hayan encontrado archivos
     if not files: 
         logger.warning("Alerta: No hay archivos nuevos para procesar")
+        return []   # no velovemos nada
 
     # logging de cuantos archivos a procesar existen
     logger.info(f"Se procesarán {len(files)} archivos")
@@ -36,12 +37,12 @@ def etl_flow_orchestration():
     logger.info("Añadiendo archivos a cola de procesamiento...")
     subflows_results = []   
     for filepath in files:
-        run = etl_flow().submit(filepath) # ejecutamos cada el proceso ETL para cada archivo de forma paralela
+        run = etl_flow.submit(filepath) # ejecutamos cada el proceso ETL para cada archivo de forma paralela
         subflows_results.append(run) # guardamos los resultados de las ejecuciones
 
     # esperamos a que termine de procesarse cada archivo
     logger.info("Proceso ETL ejecutandose...")
-    results = [r.results() for r in subflows_results]
+    results = [r.result() for r in subflows_results]
 
     # 3. Creación de backup
     logger.info("Creamos el backup de hoy")
@@ -51,6 +52,8 @@ def etl_flow_orchestration():
     logger.info("=" * 80)
     logger.info("Proceso ETL de Visitas Web completado")
     logger.info("=" * 80)
+
+    return results
 
 
 

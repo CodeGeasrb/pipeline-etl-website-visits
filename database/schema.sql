@@ -45,7 +45,7 @@ CREATE TABLE errores (
     nombreArchivo VARCHAR(255),
     email VARCHAR(255),
     tipoError VARCHAR(255),
-    fechaError DATE DEFAULT CURRENT_DATE, -- DATETIME automático para mayor trazabilidad
+    fechaError DATE DEFAULT (CURRENT_DATE), -- DATETIME automático para mayor trazabilidad
     
     PRIMARY KEY (idError)
 );
@@ -54,7 +54,7 @@ CREATE TABLE errores (
 -- Creamos la tabla "bitacora" -- Bitacora de control para archivos que pudieron se procesados y no, y la tasa de registros exitosos en estos
 CREATE TABLE bitacora (
 	idBitacora INT AUTO_INCREMENT NOT NULL,
-	fechaProceso DATE DEFAULT CURRENT_DATE, 
+	fechaProceso DATE DEFAULT (CURRENT_DATE), 
 	nombreArchivo VARCHAR(255),
 	registrosExitosos INT,
 	registrosFallidos INT,

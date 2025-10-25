@@ -1,5 +1,7 @@
+from importlib.abc import FileLoader
 from prefect.task_runners import ConcurrentTaskRunner
 from prefect import flow
+from pathlib import Path
 
 from utils.utils import setup_logger
 
@@ -20,6 +22,10 @@ def etl_flow(filepath: str):
     # Obtener el nombre del file
     filename = filepath.name
 
+    # pasar filepath string a Path
+    if isinstance(filepath, str):
+        filepath = Path(FileLoader)
+
     # inicializar archivo de logging
     logger = setup_logger(filename)
     logger.info(f"=== Iniciando proceso ETL para archivo: {filename} ===")
@@ -27,10 +33,15 @@ def etl_flow(filepath: str):
     # intentamos correr el flujo ETL
     try:
         filepath = extract(filename, logger)    # extract
+
         stats_df, visitors_df, errors_df = transform(filepath, logger)   # transform
+
         load(filename, visitors_df, stats_df, errors_df, logger) # load
-        post_processing(filepath, logger)
+
+        post_processing(filepath, logger)   # post processing
         logger.info(f"=== Archivo {filename} procesado con éxito ===")
+        return True
+
     except Exception as e:
         logger.error(f"Error: Fallo procesando el archivo: {filename}")
         raise e
