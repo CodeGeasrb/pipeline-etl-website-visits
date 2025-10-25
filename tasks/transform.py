@@ -1,4 +1,11 @@
-from utils.utils import setup_logger, validate_file_loading, validate_file_layout, validate_data_quality, prepare_data
+import logging
+from utils.utils import (
+    setup_logger, 
+    validate_file_loading, 
+    validate_file_layout, 
+    validate_data_quality,
+    prepare_data
+)
 
 
 from typing import Tuple, Optional
@@ -9,10 +16,9 @@ import pandas as pd
 
         
 @task(name="transformar datos", retries=2, retry_delay_seconds=60)
-def transform(filepath: Path) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
-    """ Valida la calidad de los datos para después hacer las transformaciones necesarias previo a la carga."""
+def transform(filepath: Path, logger: logging.Logger) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    """ Esta tarea valida la calidad de los datos para después hacer las transformaciones necesarias previo a la carga."""
     # inicializar el logger
-    logger = setup_logger()
     logger.info("Iniciando etapa de transformación")
 
     # extraemos el nombre del archivo 
@@ -36,9 +42,10 @@ def transform(filepath: Path) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
 
             # preparamos los datos para la carga
             logger.info("Preparando datos para la carga...")
-            stats_df, errors_df = prepare_data(filename, file_ok_df, file_err_df, logger)
-            return stats_df, errors_df
-    logger.warning("Alerta: Este archivo no puede ser procesado")
+            stats_df, visitors_df, errors_df = prepare_data(filename, file_ok_df, file_err_df, logger)
+            return stats_df, visitors_df, errors_df
+    
+    logger.warning("Alerta: Este archivo está vacío")
 
 
 

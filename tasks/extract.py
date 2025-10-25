@@ -1,3 +1,4 @@
+import logging
 from utils.utils import setup_logger, sftp_connection
 from typing import Optional
 from prefect import task
@@ -6,11 +7,8 @@ from pathlib import Path
 
 # Tarea de extracción de datos
 @task(name="Extracción de datos", retries=2, retry_delay_seconds=60)
-def extract(filename: str) -> Optional[Path]:
-    """ Descarga un archivo desde el servidor de inicio a un directorio temporal en el servidor del ETL"""
-    # inicializar un archivo log
-    logger = setup_logger(filename)
-    
+def extract(filename: str, logger: logging.Logger) -> Optional[Path]:
+    """ Esta tarea descarga un archivo desde el servidor de inicio a un directorio temporal en el servidor del ETL"""
     # crear logging de inicio
     logger.info("Iniciando etapa de extración")
 

@@ -7,9 +7,9 @@ CREATE TABLE visitantes (
     email VARCHAR(255) NOT NULL,
     fechaPrimeraVisita DATE,
     fechaUltimaVisita DATE, 
-    visitasTotales INT DEFAULT 0,
-    visitasAnioActual INT DEFAULT 0,
-    visitasMesActual INT DEFAULT 0,
+    visitasTotales INT,
+    visitasAnioActual INT,
+    visitasMesActual INT,
     
     PRIMARY KEY (email)
 );
@@ -24,11 +24,11 @@ CREATE TABLE estadisticas (
     baja VARCHAR(255),
     fechaEnvio DATETIME, -- DATETIME para mayor trazabilidad
     fechaOpen DATETIME,  
-    opens INT DEFAULT 0,
-    opensVirales INT DEFAULT 0,
+    opens INT,
+    opensVirales INT,
     fechaClick DATETIME,  
-    clicks INT DEFAULT 0,
-    clicksVirales INT DEFAULT 0,
+    clicks INT,
+    clicksVirales INT,
     links TEXT, 	-- Los links pueden ser muy largos
     ips VARCHAR(255),
     navegadores VARCHAR(255),
@@ -45,7 +45,7 @@ CREATE TABLE errores (
     nombreArchivo VARCHAR(255),
     email VARCHAR(255),
     tipoError VARCHAR(255),
-    fechaError DATETIME DEFAULT CURRENT_TIMESTAMP, -- DATETIME automático para mayor trazabilidad
+    fechaError DATE DEFAULT CURRENT_DATE, -- DATETIME automático para mayor trazabilidad
     
     PRIMARY KEY (idError)
 );
@@ -54,9 +54,10 @@ CREATE TABLE errores (
 -- Creamos la tabla "bitacora" -- Bitacora de control para archivos que pudieron se procesados y no, y la tasa de registros exitosos en estos
 CREATE TABLE bitacora (
 	idBitacora INT AUTO_INCREMENT NOT NULL,
+	fechaProceso DATE DEFAULT CURRENT_DATE, 
 	nombreArchivo VARCHAR(255),
-	registrosExitosos INT DEFAULT 0,
-	registrosFallidos INT DEFAULT 0,
+	registrosExitosos INT,
+	registrosFallidos INT,
 	estatus VARCHAR(255) NOT NULL,	-- Procesado/No procesado
 	
 	PRIMARY KEY (idBitacora)
