@@ -1,7 +1,12 @@
 from sqlalchemy.pool import QueuePool
-from utils.utils import create_mysql_connection_url, load_statistics_table,load_staging_visitors_table, load_errors_table, load_log_table
+from sqlalchemy import create_engine
 from prefect import task
-from sqlalchemy import create_engine, text
+from utils.utils_load import (create_mysql_connection_url,
+                         load_statistics_table,
+                         load_staging_visitors_table,
+                         load_errors_table,
+                         load_log_table
+)
 
 import pandas as pd
 import logging
@@ -51,21 +56,4 @@ def load(filename: str, stats_df: pd.DataFrame, visitors_df: pd.DataFrame, error
             
 
             
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

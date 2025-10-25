@@ -1,5 +1,5 @@
 import logging
-from utils.utils import setup_logger, sftp_connection
+from utils.utils_extract import sftp_connection
 from typing import Optional
 from prefect import task
 from pathlib import Path

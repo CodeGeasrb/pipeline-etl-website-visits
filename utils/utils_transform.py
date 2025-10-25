@@ -1,23 +1,10 @@
-from contextlib import contextmanager
-from sqlite3 import Connection
-from dotenv import load_dotenv
+from typing import Tuple, Optional
 from pathlib import Path
-from typing import Optional, Set, Tuple, List
-from prefect import task
-from sqlalchemy import create_engine, text
 
 import pandas as pd
 import numpy as np
-import zipfile
-import logging
 import datetime
-import paramiko
-import os
-
-
-# Cargar variables de entorno para la configuración de la conexión SFTP y MySQL
-load_dotenv(dotenv_path="config/.env")
-
+import logging
 
 # Columnas esperadas por archivo
 VALID_COLUMNS = [
@@ -35,6 +22,7 @@ DATE_COLUMNS = [
         "Fecha click"
 ]
 
+# Mapeo de columnas archivos-tablas sql
 COLUMNS_TO_MAP = {
     "email": "email",
     "jyv": "jyv",
@@ -71,43 +59,6 @@ COLUMNS_DATA_TYPES = {
     "Navegadores": "str",
     "Plataformas": "str"
 }
-
-
-
-
-def setup_logger(filename: str) -> logging.Logger:
-    """ Setup de la configuración de logger """
-    # fecha estandarizada
-    log_date = datetime.now().strftime('%d%m%y')
-
-    # directorio del log del archivo que será procesado
-    log_dir = os.getenv("DIR_LOGS") / log_date
-    log_dir.mkdir(parents=True, exist_ok=True)  # asegurar que el directorio donde se guardan estos logs existe, sino crearlo
-
-    # configuración del logger
-    logger = logging.getLogger(filename)
-    logger.setLevel(logging.INFO)   # nivel de debug
-
-    # establecer el logger
-    handler = logging.FileHandler(log_dir / f"{filename}.log")
-    logger.addHandler(handler)
-    
-    return logger
-
-
-def create_mysql_connection_url() -> str:
-    """ Configuración del mysql connection string para sqlalchemy """
-    # leer las credenciales del servidor mysql
-    host = os.getenv("HOST_MYSQL")
-    port = os.getenv("PORT_MYSQL")
-    user = os.getenv("USER_MYSQL")
-    password = os.getenv("PASSWORD_MYSQL")
-    database = os.getenv("DATABASE_MYSQL")
-
-    # crear el connection string
-    connection_string = f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
-    
-    return connection_string
 
 
 
@@ -292,149 +243,4 @@ def prepare_data(filename: str, file_ok_df: pd.DataFrame, file_err_df: pd.DataFr
 
     return stats_df, visitors_df, errors_df
 
-
-def load_statistics_table(stats_df: pd.DataFrame, conn: Connection) -> None:
-    """ Esta función carga un datarame de estadisticas a su tabla correspondiente en sql """
-    stats_df.to_sql(
-        name="estadisticas",
-        con=conn,
-        if_exists='append',
-        index=False
-    )
-
-
-def load_staging_visitors_table(visitors_df: pd.DataFrame, staging_table_name: str, conn: Connection) -> None:
-    """ Esta función se encarga una dataframe temporal de visitantes a su tabla corrspondiente en sql """
-    visitors_df.to_sql(
-        name=staging_table_name,
-        con =conn,
-        if_exists='replace',
-        index=False
-    )
-    # ejecutar código SQL para upsert en tabla visitantes real
-    incremental_merge_query = text(f"""
-        WITH agregados AS (
-            SELECT * FROM {staging_table_name}
-        )
-        MERGE INTO visitantes AS T
-        USING agregados AS S
-        ON T.email = S.email
-        WHEN MATCHED THEN
-            UPDATE SET
-                fechaPrimeraVisita = CASE
-                                        WHEN S.fechaPrimeraVisita = T.fechaPrimeraVisita
-                                        THEN S.fechaPrimeraVisita
-                                        ELSE T.fechaPrimeraVisita
-                                END,
-
-                fechaUltimaVisita = CASE
-                                    WHEN S.fechaUltimaVisita > T.fechaUltimaVisita
-                                    THEN S.fechaUltimaVisita
-                                    ELSE T.fechaUltimaVisita
-                                END,
-
-                visitasTotales = T.visitasTotales + S.visitasTotales
-
-                visitasAnioActual = CASE
-                                    WHEN EXTRACT(YEAR FROM T.fechaUltimaVisita) = EXTRACT(YEAR FROM CURRENT_DATE)
-                                    THEN T.visitasAnioActual + S.visitasAnioActual
-                                    ELSE S.visitasAnioActual
-                                END,
-
-                visitasMesActual = CASE
-                                    WHEN EXTRACT(YEAR FROM T.fechaUltimaVisita) = EXTRACT(YEAR FROM CURRENT_DATE)
-                                    AND EXTRACT(MONTH FROM T.fechaUltimaVisita) = EXTRACT(MONTH FROM S.fechaUltimaVisita)
-                                    THEN T.visitasMesActual + S.visitasMesActual
-                                    ELSE S.visitasMesActual
-                                END,
-        
-        WHEN NOT MATCHED BY TARGET THEN
-            INSERT (email, fechaPrimeraVisita, fechaUltimaVisita, visitasTotales, visitasAnioActual, visitasMesActual)
-            VALUES (S.email, S.fechaPrimeraVisita, S.fechaUltimaVisita, S.visitasTotales, S.visitasAnioActual, S.visitasMesActual);
-    """
-    )
-    conn.execute(incremental_merge_query)   
-    conn.execute(f"DROP TABLE  IF EXISTS {staging_table_name}")  # borramos tabla temporal
-
-
-def load_errors_table(errors_df: pd.DataFrame, conn: Connection) -> None:
-    """ Esta función carga un datarame de estadisticas a su tabla correspondiente en sql """
-    errors_df.to_sql(
-        name="errores",
-        con=conn,
-        if_exists='append',
-        index=False
-    )
-
-
-def load_log_table(filename: str, stats_df: pd.DataFrame, errors_df: pd.DataFrame, conn: Connection) -> None:
-    """ Esta función carga un registro nuevo en la tabla 'bitacora' """
-    bitacora_dict = {
-        "nombreArchivo": filename,
-        "registrosExitosos": len(stats_df),
-        "registrosFallidos": len(errors_df),
-        "estatus": "Completado" if len(errors_df) > 0 else "Completado con errores"
-    }
-    pd.DataFrame(bitacora_dict).to_sql(
-        name="bitacora",
-        con=conn,
-        if_exists='append',
-    index=False 
-    )
-
-
-def move_to_backup(filepath: str) -> None:
-    """ Esta función mueve un archivo descargado hasta el directorio del backup """
-    # creamos directorio del backuo si no existe
-    backup_dir = os.getenv("DIR_BACKUP")
-    backup_dir.mkdir(parents=True, exists_ok=True)
-
-    # creamos el path del archivo en el backup
-    backup_path = backup_dir / filepath.name
-
-    # movemos el archivo
-    filepath.rename(backup_path)
-
-
-def remove_from_sftp(filepath):
-    """ Esta función remueve el archivo del directorio original en el servidor sftp """
-    # definimos el directorio original
-    sftp_dir = os.getenv("DIR_SFTP")
-
-    # definimos el directorio del archivo original
-    sftp_path = sftp_dir / filepath.name
-
-    # removemos el archivo
-    with sftp_connection() as sftp:
-        sftp.remove(sftp_path)
-
-
-def zip_compress() -> None:
-    """Esta función encapsula varios archivos descargados y los comprime en un .zip """
-    # definimos el directorio y la lista de archivos para el backup
-    backup_dir = os.getenv("DIR_BACKUP")
-    files_backup = [file for file in os.listdir(backup_dir) if file.startswith("report_") and file.endswith(".txt")]
-    
-
-    # creamos la ruta del .zip backup de hoy
-    today_date = datetime.date.today().strftime('%d%m%y')
-    zip_path = backup_dir / f"backup_{today_date}.zip" 
-
-    # validamos que haya archivos para el backup
-    if len(files_backup) > 0:
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file in files_backup:
-                zipf.write(file, file.name)
-                file.unlink()
-
-    
-
-
-
-
-
-
-
-    
-        
 

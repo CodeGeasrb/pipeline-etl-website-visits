@@ -1,9 +1,7 @@
-
+from utils.utils_postprocessing import move_to_backup, remove_from_sftp, zip_compress
 from prefect import task
 
 import logging
-
-from utils.utils import move_to_backup, remove_from_sftp, zip_compress
 
 
 @task(name="post-procesamiento", retries=2, retry_delay_seconds=60)
@@ -26,33 +24,6 @@ def compress_backup():
     """ Tarea para comprimir todos los archivos procesados y guardarlos como backup """    
     # comprimimos mediante zip
     zip_compress()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

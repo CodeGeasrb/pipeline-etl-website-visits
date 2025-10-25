@@ -1,17 +1,14 @@
-import logging
-from utils.utils import (
-    setup_logger, 
+from typing import Tuple, Optional
+from pathlib import Path
+from prefect import task
+from utils.utils_transform import (
     validate_file_loading, 
     validate_file_layout, 
     validate_data_quality,
     prepare_data
 )
 
-
-from typing import Tuple, Optional
-from pathlib import Path
-from prefect import task
-
+import logging
 import pandas as pd
 
         
@@ -46,28 +43,6 @@ def transform(filepath: Path, logger: logging.Logger) -> Tuple[pd.DataFrame, pd.
             return stats_df, visitors_df, errors_df
     
     logger.warning("Alerta: Este archivo está vacío")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
